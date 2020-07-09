@@ -1,9 +1,10 @@
 #!/bin/bash
 
 BASE=$(dirname $(readlink -f $0))
-PBF=/scratch/local/pbf/nordrhein-westfalen-latest.osm.pbf
-SHP=$PWD/hu_nw_shp_202001.shp
-OUTFILE=$PWD/alkisdiff-nrw.sqlite
+
+PBF=$1
+SHP=$2
+OUTFILE=$3
 
 time docker run -it --rm \
 	-v ${BASE}:/current \

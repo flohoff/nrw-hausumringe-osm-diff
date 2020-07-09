@@ -1,0 +1,12 @@
+
+This is the OpenStreetmap to ALKIS NRW diff toolchain. The output is an sqlite file
+for usage with https://github.com/flohoff/spatialite-rest
+
+Build the dockerfile with 
+
+	docker build -t flo/postgis .
+
+Then run
+
+	./run mylittle.pbf hu_nw_shp_202001.shp alkisdiff-nrw.sqlite
+
