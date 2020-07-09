@@ -6,7 +6,7 @@ PBF=$(readlink -f $1)
 SHP=$(readlink -f $2)
 OUTFILE=$(readlink -f $3)
 
-time docker run -it --rm \
+time docker run -i --rm \
 	-v ${BASE}:/current \
 	-v $(dirname ${OUTFILE}):/output \
 	-v $(dirname ${PBF}):/pbf \
