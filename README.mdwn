@@ -10,3 +10,9 @@ Then run
 
 	./run mylittle.pbf hu_nw_shp_202001.shp alkisdiff-nrw.sqlite
 
+Download
+========
+
+Die aktuellen Nordrhein-Westfalen Hausumringe finden sich hier. Aktualisiert wird 2 mal im Jahr.
+
+https://www.bezreg-koeln.nrw.de/brk_internet/geobasis/liegenschaftskataster/hausumringe/index.html
