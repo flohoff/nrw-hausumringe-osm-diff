@@ -2,9 +2,9 @@
 
 BASE=$(dirname $(readlink -f $0))
 
-PBF=$1
-SHP=$2
-OUTFILE=$3
+PBF=$(readlink -f $1)
+SHP=$(readlink -f $2)
+OUTFILE=$(readlink -f $3)
 
 time docker run -it --rm \
 	-v ${BASE}:/current \
