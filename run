@@ -8,7 +8,7 @@ OUTFILE=$3
 
 time docker run -it --rm \
 	-v ${BASE}:/current \
-	-v $(dirname ${OUTFILE}:/output \
+	-v $(dirname ${OUTFILE}):/output \
 	-v $(dirname ${PBF}):/pbf \
 	-v $(dirname ${SHP}):/shp \
 	-e SHP=/shp/$(basename ${SHP} \
