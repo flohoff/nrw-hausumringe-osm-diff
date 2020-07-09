@@ -24,6 +24,10 @@ su - postgres -c "createuser root -s"
 createdb osm -O root
 psql osm -c "create extension postgis;"
 psql osm -c "create extension hstore;"
+psql osm -c "alter system set work_mem = '512MB';"
+psql osm -c "alter system set shared_buffers = '1GB';"
+psql osm -c "alter system set maintenance_work_mem = '1GB';"
+psql osm -c "SELECT pg_reload_conf();"
 
 time ogr2ogr \
 	-f "PostgreSQL" \
@@ -77,8 +81,8 @@ select  *
 into    hu_diff
 from    (
         select  *,
-                ST_Area(ST_Transform(diff, 25832)) area,
-                ST_Area(ST_Transform(alkisgeom, 25832)) alkisarea
+                ST_Area(diff, true) area,
+                ST_Area(alkisgeom, true) alkisarea
         from    (
                 select  ogc_fid,
                         ags,
@@ -104,13 +108,13 @@ where   area > 5
 ;
  
 select  *,
-        ST_Area(ST_Transform(diff, 25832)) areadiff
+        ST_Area(diff, true) areadiff
 into buildingmerge
 from    (
 	select  *,
 		ST_Difference(geomalkis, geomosm) as diff,
-		ST_Area(ST_Transform(geomalkis, 25832)) areaalkis,
-		ST_Area(ST_Transform(geomosm, 25832)) areaosm
+		ST_Area(geomalkis, true) areaalkis,
+		ST_Area(geomosm, true) areaosm
 	from	(
 		select  hu.ogc_fid,
 			hu.ags,
