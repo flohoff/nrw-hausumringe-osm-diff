@@ -6,7 +6,7 @@ PBF=$1
 SHP=$2
 OUTFILE=$3
 
-time docker run -it --rm \
+time docker run -i --rm \
 	-v ${BASE}:/current \
 	-v $(dirname ${OUTFILE}):/output \
 	-v $(dirname ${PBF}):/pbf \
