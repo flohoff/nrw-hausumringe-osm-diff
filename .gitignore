@@ -1,0 +1,7 @@
+.*
+!.gitignore
+*.zip
+*.dbf
+*.shp
+*.shx
+*.sqlite

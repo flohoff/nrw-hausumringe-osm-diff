@@ -1,0 +1,18 @@
+#!/bin/bash
+
+BASE=$(dirname $(readlink -f $0))
+PBF=/scratch/local/pbf/nordrhein-westfalen-latest.osm.pbf
+SHP=$PWD/hu_nw_shp_202001.shp
+OUTFILE=$PWD/alkisdiff-nrw.sqlite
+
+time docker run -it --rm \
+	-v ${BASE}:/current \
+	-v $(dirname ${OUTFILE}:/output \
+	-v $(dirname ${PBF}):/pbf \
+	-v $(dirname ${SHP}):/shp \
+	-e SHP=/shp/$(basename ${SHP} \
+        -e PBF=/pbf/$(basename ${PBF} \
+	-e OUTFILE=/output/$(basename ${OUTFILE}) \
+        flo/postgis \
+	/current/withindocker-process
+

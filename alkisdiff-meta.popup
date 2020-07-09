@@ -1,0 +1,10 @@
+ALKIS building area not in OSM {{ text }}
+<p>
+Debug info:<br>
+ogc_fid {{ id }}<br>
+ags {{ ags }}<br>
+oi {{ oi }}<br>
+gfk {{ gfk }}<br>
+<br>
+alkis area: {{ alkisarea }}<br>
+</p>

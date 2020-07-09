@@ -1,0 +1,190 @@
+#!/bin/bash
+
+if [ -z "${SHP}" ]; then
+	echo Need SHP environment
+	exit 1
+fi
+
+if [ -z "${PBF}" ]; then
+	echo Need PBF environment
+	exit 1
+fi
+
+BASE=/current
+
+set -x
+
+# Turn off sync/fsync etc - we throw away the database anyway
+echo "fsync=off" >>/etc/postgresql/11/main/postgresql.conf
+echo "synchronous_commit=off" >>/etc/postgresql/11/main/postgresql.conf
+
+/etc/init.d/postgresql start
+
+su - postgres -c "createuser root -s"
+createdb osm -O root
+psql osm -c "create extension postgis;"
+psql osm -c "create extension hstore;"
+
+time ogr2ogr \
+	-f "PostgreSQL" \
+	-nlt MULTIPOLYGON \
+	-a_srs "EPSG:5652" \
+	-nln "hu_nw" \
+	PG:"dbname=osm" \
+	${SHP}
+
+time osmium tags-filter \
+	-o /tmp/local.pbf \
+	${PBF} \
+	"building=*"
+
+time osm2pgsql --hstore \
+	--create --latlong \
+	--slim --cache 6000 \
+	-x \
+	-S ${BASE}/flo.style \
+	-d osm -U root \
+	/tmp/local.pbf
+
+rm /tmp/local.pbf
+
+# 1610 - Dachüberstände? Dächer sowas.
+# 1250 - Hochspannungsmasten
+#
+
+psql -e osm <<EOSQL
+\timing on
+
+drop table if exists hu;
+select	ogc_fid,
+	ags,
+	oi,
+	gfk,
+	ST_Transform(wkb_geometry, 4326) as geom,
+	split_part(gfk,'_', 2) as gebaeudefunktion
+into	hu
+from	hu_nw
+where	split_part(gfk,'_', 2) not in (
+	'1610', '1611', '1250', '1440', '2420', 
+	'1432', '1431', '1430', '3050', '1230',
+	'1201', '2465');
+
+create index idx_hu_geom on hu using gist ( geom );
+analyze hu;
+drop table if exists hu_diff;
+
+select  *
+into    hu_diff
+from    (
+        select  *,
+                ST_Area(ST_Transform(diff, 25832)) area,
+                ST_Area(ST_Transform(alkisgeom, 25832)) alkisarea
+        from    (
+                select  ogc_fid,
+                        ags,
+                        oi,
+                        gfk,
+                        coalesce(ST_Difference(geom, building), geom) as diff,
+                        geom as alkisgeom,
+                        building as osmgeomcollection
+                from    (
+                        select  hu.ogc_fid,
+                                hu.ags,
+                                hu.oi,
+                                hu.gfk,
+                                hu.geom,
+                                ST_Union(p.way) as building
+                        from    hu
+                                left outer join planet_osm_polygon p on ( ST_Intersects(p.way, hu.geom) and p.building <> '' )
+                        group by hu.geom,ogc_fid,ags,oi,gfk
+                        ) foo
+                ) bar
+        ) baz
+where   area > 5
+;
+ 
+select  *,
+        ST_Area(ST_Transform(diff, 25832)) areadiff
+into buildingmerge
+from    (
+	select  *,
+		ST_Difference(geomalkis, geomosm) as diff,
+		ST_Area(ST_Transform(geomalkis, 25832)) areaalkis,
+		ST_Area(ST_Transform(geomosm, 25832)) areaosm
+	from	(
+		select  hu.ogc_fid,
+			hu.ags,
+			hu.oi,
+			hu.gfk,
+			hu.gebaeudefunktion,
+			hu.geom as geomalkis,
+			p.osm_id,
+			p.way as geomosm,
+			p.building,
+			p.power
+		from    hu left outer join planet_osm_polygon p
+				on ( ST_Intersects(p.way, hu.geom) and p.building <> '' )
+		) intersections
+	) areas
+;
+
+
+select  *
+into    buildingmisclassified
+from    (
+        select  ogc_fid,ags,oi,gfk,geomalkis as geom,areaalkis,areaosm,osm_id,gebaeudefunktion,building,
+                'Not garage or garages (' || building || ')' as error,
+                'red' as style
+        from    buildingmerge
+        where   areadiff < areaalkis*0.1
+        and     gebaeudefunktion = '2463'
+        and     building is not null
+        and     building not in ( 'garage', 'garages' )
+        and     geomalkis is not null
+        union all
+        select  ogc_fid,ags,oi,gfk,geomalkis as geom,areaalkis,areaosm,osm_id,gebaeudefunktion,building,
+                'Power substation without power tag' as error,
+                'cyan' as style
+        from    buildingmerge
+        where   areadiff < areaalkis*0.1
+        and     gebaeudefunktion = '2523'
+        and     power is null
+        and     geomalkis is not null
+        union all
+        select  ogc_fid,ags,oi,gfk,geomalkis as geom,areaalkis,areaosm,osm_id,gebaeudefunktion,building,
+                'Shed not tagges as shed (' || building || ')' as error,
+                'brown' as style
+        from    buildingmerge
+        where   areadiff < areaalkis*0.1
+        and     gebaeudefunktion = '2723'
+        and     building is not null
+        and     building <> 'shed'
+        and     geomalkis is not null
+        ) foo
+;
+
+EOSQL
+
+rm -f ${OUTFILE}
+
+ogr2ogr -f SQLite \
+	-dsco SPATIALITE=YES \
+	-nln buildingnotinosm \
+	${OUTFILE} \
+	PG:"dbname='osm'" \
+	-sql "select ogc_fid as id, ags, oi, gfk, diff as geom, area, alkisarea, 'Area ' || trunc(area) || 'm²' as text, 'default' as style from hu_diff"
+
+ogr2ogr -f SQLite \
+	-append -update \
+	-nln misclassified \
+	${OUTFILE} \
+	PG:"dbname='osm'" \
+	-sql "select ogc_fid as nas_ogc_fid, ags, oi, gfk, geom, gebaeudefunktion,building,error,style from buildingmisclassified"
+
+cd ${BASE}
+sqlite3 ${OUTFILE} <${BASE}/alkisdiff-meta.sql
+sqlite3 ${OUTFILE} "update buildingnotinosm set style='green' where area < alkisarea*0.1;"
+sqlite3 ${OUTFILE} "update buildingnotinosm set style='red' where area > alkisarea*0.9;"
+sqlite3 ${OUTFILE} "update buildingnotinosm set style='yellow' where area between alkisarea*0.1 and alkisarea*0.9;"
+
+chown --reference $(dirname ${OUTFILE}) ${OUTFILE}

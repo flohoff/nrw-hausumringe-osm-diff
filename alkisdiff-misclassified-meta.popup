@@ -1,0 +1,14 @@
+<h4>Misclassified building</h4>
+<p>
+{{ error }}
+</p>
+<p>
+Debug info:<br>
+ogc_fid {{ nas_ogc_fid }}<br>
+ags: {{ ags }}<br>
+oi: {{ oi }}<br>
+gfk: {{ gfk }}<br>
+gebaeudefunktion: {{ gebaeudefunktion }}<br>
+building: {{ building }}<br>
+</p>
+{{> remotecontrol }}
