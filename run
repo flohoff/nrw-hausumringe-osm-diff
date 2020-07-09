@@ -11,8 +11,8 @@ time docker run -it --rm \
 	-v $(dirname ${OUTFILE}):/output \
 	-v $(dirname ${PBF}):/pbf \
 	-v $(dirname ${SHP}):/shp \
-	-e SHP=/shp/$(basename ${SHP} \
-        -e PBF=/pbf/$(basename ${PBF} \
+	-e SHP=/shp/$(basename ${SHP}) \
+        -e PBF=/pbf/$(basename ${PBF}) \
 	-e OUTFILE=/output/$(basename ${OUTFILE}) \
         flo/postgis \
 	/current/withindocker-process
