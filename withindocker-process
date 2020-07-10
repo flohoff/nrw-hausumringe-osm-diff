@@ -24,8 +24,8 @@ su - postgres -c "createuser root -s"
 createdb osm -O root
 psql osm -c "create extension postgis;"
 psql osm -c "create extension hstore;"
-psql osm -c "alter system set work_mem = '512MB';"
-psql osm -c "alter system set shared_buffers = '128MB';"
+#psql osm -c "alter system set work_mem = '512MB';"
+#psql osm -c "alter system set shared_buffers = '128MB';"
 psql osm -c "alter system set maintenance_work_mem = '512MB';"
 psql osm -c "SELECT pg_reload_conf();"
 
@@ -44,7 +44,7 @@ time osmium tags-filter \
 
 time osm2pgsql --hstore \
 	--create --latlong \
-	--slim --cache 3000 \
+	--slim --cache 6000 \
 	-x \
 	-S ${BASE}/flo.style \
 	-d osm -U root \
@@ -169,28 +169,34 @@ from    (
 
 EOSQL
 
-rm -f new.${OUTFILE}
+SQL=/tmp/output.sqlite
 
 ogr2ogr -f SQLite \
 	-dsco SPATIALITE=YES \
 	-nln buildingnotinosm \
-	new.${OUTFILE} \
+	${SQL} \
 	PG:"dbname='osm'" \
 	-sql "select ogc_fid as id, ags, oi, gfk, diff as geom, area, alkisarea, 'Area ' || trunc(area) || 'm²' as text, 'default' as style from hu_diff"
 
 ogr2ogr -f SQLite \
 	-append -update \
 	-nln misclassified \
-	new.${OUTFILE} \
+	${SQL} \
 	PG:"dbname='osm'" \
 	-sql "select ogc_fid as nas_ogc_fid, ags, oi, gfk, geom, gebaeudefunktion,building,error,style from buildingmisclassified"
 
 cd ${BASE}
-sqlite3 new.${OUTFILE} <${BASE}/alkisdiff-meta.sql
-sqlite3 new.${OUTFILE} "update buildingnotinosm set style='green' where area < alkisarea*0.1;"
-sqlite3 new.${OUTFILE} "update buildingnotinosm set style='red' where area > alkisarea*0.9;"
-sqlite3 new.${OUTFILE} "update buildingnotinosm set style='yellow' where area between alkisarea*0.1 and alkisarea*0.9;"
+sqlite3 ${SQL} <${BASE}/alkisdiff-meta.sql
+sqlite3 ${SQL} "update buildingnotinosm set style='green' where area < alkisarea*0.1;"
+sqlite3 ${SQL} "update buildingnotinosm set style='red' where area > alkisarea*0.9;"
+sqlite3 ${SQL} "update buildingnotinosm set style='yellow' where area between alkisarea*0.1 and alkisarea*0.9;"
 
-chown --reference $(dirname ${OUTFILE}) new.${OUTFILE}
-mv new.${OUTFILE} ${OUTFILE}
+# Move result out of container
+mv ${SQL} ${OUTFILE}.new
+
+# Fix permission from directory
+chown --reference $(dirname ${OUTFILE}) ${OUTFILE}.new
+
+# "Atomic" replace
+mv ${OUTFILE}.new ${OUTFILE}
 
