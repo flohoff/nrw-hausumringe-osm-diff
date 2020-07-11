@@ -178,12 +178,16 @@ ogr2ogr -f SQLite \
 	PG:"dbname='osm'" \
 	-sql "select ogc_fid as id, ags, oi, gfk, diff as geom, area, alkisarea, 'Area ' || trunc(area) || 'm²' as text, 'default' as style from hu_diff"
 
+sqlite3 ${SQL} "create index idx_buildingnotinosm_geom on buildingnotinosm ( geom );"
+
 ogr2ogr -f SQLite \
 	-append -update \
 	-nln misclassified \
 	${SQL} \
 	PG:"dbname='osm'" \
 	-sql "select ogc_fid as nas_ogc_fid, ags, oi, gfk, geom, gebaeudefunktion,building,error,style from buildingmisclassified"
+
+sqlite3 ${SQL} "create index idx_misclassified_geom on misclassified ( geom );"
 
 cd ${BASE}
 sqlite3 ${SQL} <${BASE}/alkisdiff-meta.sql
